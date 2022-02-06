@@ -1,18 +1,9 @@
 #include "stringlistthread.h"
 
-char* StrToChar(QString s)
-{
-    QByteArray d = s.toUtf8();
-    char* c = new char[d.size() + 1];
-    c[d.size()] = 0;
-    strcpy(c, d.data());
-    return c;
-}
-
-void StringListThread::add(QString s)
+void StringListThread::append(const QString& s)
 {
     QMutexLocker locker(&mutex);
-    sl.append(StrToChar(s));
+    sl.append(s);
     if (sl.size() > 10000000) {
         sl.removeDuplicates();
         if (sl.size() > 5000000) {
@@ -24,15 +15,15 @@ void StringListThread::add(QString s)
     }
 }
 
-void StringListThread::append_not_mutex(QString&& s)
+void StringListThread::append_not_mutex(const QString& s)
 {
     sl.append(s);
 }
 
-void StringListThread::add_first(QString s)
+void StringListThread::append_first(QString s)
 {
     QMutexLocker locker(&mutex);
-    sl.insert(0, StrToChar(s));
+    sl.insert(0, s);
 }
 
 void StringListThread::clear()
@@ -50,8 +41,9 @@ void StringListThread::save_to_ts(QTextStream& ts)
     }
 }
 
-int StringListThread::size_not_mutex()
+int StringListThread::size()
 {
+    QMutexLocker locker(&mutex);
     return sl.size();
 }
 

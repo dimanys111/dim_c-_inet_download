@@ -11,10 +11,25 @@
 #include <htmlcxx/html/tree.h>
 
 #include "mainwindow.h"
+#include "player.h"
 #include "robot.h"
 
 using namespace htmlcxx;
 using namespace std;
+
+QString randSimv()
+{
+    const QString possibleCharacters("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789");
+    const int randomStringLength = 12; // assuming you want random strings of 12 characters
+
+    QString randomString;
+    for (int i = 0; i < randomStringLength; ++i) {
+        int index = rand() % possibleCharacters.length();
+        QChar nextChar = possibleCharacters.at(index);
+        randomString.append(nextChar);
+    }
+    return randomString;
+}
 
 void Work_Bonga::addSl(QString s)
 {
@@ -27,22 +42,21 @@ void Work_Bonga::addSl(QString s)
 Work_Bonga::~Work_Bonga()
 {
     Work_Bonga::zap_all();
+    thread()->deleteLater();
 }
 
 Work_Bonga::Work_Bonga(Work_Bonga_M3U* wb)
     : wb(wb)
 {
-    Mythread = new QThread();
-    Mymanager.moveToThread(Mythread);
-    moveToThread(Mythread);
-    connect(Mythread, &QThread::finished, Mythread, &QThread::deleteLater);
+    moveToThread(new QThread());
+    Mymanager.moveToThread(thread());
     connect(this, &Work_Bonga::Myemit, this, &Work_Bonga::nach);
-    Mythread->start();
+    thread()->start();
 }
 
 void Work_Bonga::nach(QString url_str)
 {
-    if (stop) {
+    if (Robot::stop) {
         return;
     }
 
@@ -75,7 +89,7 @@ void Work_Bonga::nach(QString url_str)
 void Work_Bonga::replyFinished()
 {
     QNetworkReply* reply = (QNetworkReply*)sender();
-    if (stop) {
+    if (Robot::stop) {
         return;
     }
     if (reply->error() == QNetworkReply::NoError) {
@@ -83,7 +97,6 @@ void Work_Bonga::replyFinished()
         QByteArray content = reply->readAll();
 
         QString fileName = reply->url().fileName();
-        //fileName.replace(".ts", ".avi");
         if (fileName == "")
             fileName = randSimv();
         funZap(content, fileName);
@@ -94,19 +107,11 @@ void Work_Bonga::replyFinished()
     delete reply;
 }
 
-QStringList list_zap;
-QList<int> list_nom;
-int nom_pot = 0;
-
 void Work_Bonga::setStop()
 {
-    for (auto& a : list_zap) {
-        emit emit_part_vid(a, wb->name_mod);
-    }
-    stop = true;
-    Mythread->exit();
-    Mythread->wait();
-    deleteLater();
+    zap_all();
+    thread()->exit();
+    thread()->wait();
 }
 
 void Work_Bonga::zap_all()
@@ -123,22 +128,23 @@ void Work_Bonga::funZap(QByteArray& content, QString& fileName)
 {
     QString put = wb->name_mod + "/";
     QDir d;
-    bool b = d.mkpath(wb->robot->dir_bonga + put);
+    bool b = d.mkpath(Robot::dir_bonga + put);
     if (!b) {
         qDebug() << put;
     }
-    QFile f(wb->robot->dir_bonga + put + fileName);
+    QFile f(Robot::dir_bonga + put + fileName);
     if (f.open(QIODevice::WriteOnly)) {
         f.write(content);
         f.close();
     }
-    list_zap << f.fileName();
-    list_nom << QFileInfo(f).baseName().split("_").at(3).toInt();
+    Player::get_instance()->run(f.fileName().toStdString());
     auto np = QFileInfo(f).baseName().split("_").at(1).toInt();
     if (nom_pot > 0 && np != nom_pot) {
         zap_all();
     }
     nom_pot = np;
+    list_zap << f.fileName();
+    list_nom << QFileInfo(f).baseName().split("_").at(3).toInt();
     if (list_nom.size() > 5) {
         auto nom = std::distance(list_nom.begin(), std::min_element(list_nom.begin(), list_nom.end()));
         emit emit_part_vid(list_zap.at(nom), wb->name_mod);

@@ -3,6 +3,7 @@
 #include "QFile"
 #include "math.h"
 #include "work.h"
+#include <QList>
 #include <QUrl>
 #include <ctime>
 #include <htmlcxx/html/Node.h>
@@ -15,163 +16,83 @@
 using namespace htmlcxx;
 using namespace std;
 
-QMutex Work::m1;
-
-int containsListChar(QList<char*>& list, QString s)
-{
-    QByteArray buf = s.toUtf8();
-    char* c = buf.data();
-    for (int i = 0; i < list.size(); i++) {
-        int n = 0;
-        bool pr = true;
-        char* b = list.at(i);
-        while (b[n] != 0 || c[n] != 0) {
-            if (b[n] != c[n]) {
-                pr = false;
-                break;
-            }
-            n++;
-        }
-        if (pr) {
-            if (b[n] == c[n]) {
-                return i;
-            }
-        }
-    }
-    return -1;
-}
-
-QString randSimv()
-{
-    const QString possibleCharacters("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789");
-    const int randomStringLength = 12; // assuming you want random strings of 12 characters
-
-    QString randomString;
-    for (int i = 0; i < randomStringLength; ++i) {
-        int index = rand() % possibleCharacters.length();
-        QChar nextChar = possibleCharacters.at(index);
-        randomString.append(nextChar);
-    }
-    return randomString;
-}
-
 int Work::getSlSize()
 {
-    m.lock();
-    int n = Sl.size();
-    m.unlock();
-    return n;
+    return sl.size();
 }
 
 void Work::addSl(QString s)
 {
-    m.lock();
-    Sl.append(s);
-    m.unlock();
+    sl.append(s);
 }
 
 Work::~Work()
 {
+    thread()->deleteLater();
 }
 
-Work::Work(Robot* rob)
-    : rob(rob)
+Work::Work()
 {
-    stop = false;
-    Mythread = new QThread();
-    Mymanager.moveToThread(Mythread);
-    moveToThread(Mythread);
-    connect(Mythread, &QThread::finished, this, &Work::deleteLater);
-    connect(Mythread, &QThread::finished, Mythread, &QThread::deleteLater);
-    connect(this, &Work::MyemitIMG, rob->mw, &MainWindow::setImage);
-    connect(this, &Work::Myemit, this, &Work::nach);
-    Mythread->start();
-    emit Myemit();
+    moveToThread(new QThread());
+    m_manager.moveToThread(thread());
+    timer.moveToThread(thread());
+    thread()->start();
+    connect(&timer, &QTimer::timeout, this, &Work::timeout);
+    QMetaObject::invokeMethod(this, &Work::nach, Qt::QueuedConnection);
 }
 
 void Work::nach()
 {
-    while (true) {
-        if (stop) {
-            Sl.clear();
-            return;
-        }
+    if (Robot::stop) {
+        sl.clear();
+        return;
+    }
+    auto [empty, s] = sl.get_empty_size_string();
+    if (!empty) {
+        QUrl url(s);
+        dozap = false;
+        QNetworkRequest request(url);
+        request.setRawHeader(
+            "Connection",
+            "keep-alive");
+        request.setRawHeader(
+            "Upgrade-Insecure-Requests",
+            "1");
+        request.setRawHeader(
+            "User-Agent",
+            "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/46.0.2490.71 Safari/537.36");
+        request.setRawHeader(
+            "Accept",
+            "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
+        request.setRawHeader(
+            "Accept-Language",
+            "ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4");
 
-        m.lock();
-        bool b = Sl.isEmpty();
-        if (!b) {
-            S = Sl.takeFirst();
-            m.unlock();
+        reply_curent = m_manager.get(request);
+        timer.start(30000);
+        connect(reply_curent, &QNetworkReply::finished,
+            this, &Work::replyFinished);
 
-            prop = false;
-            seek = 0;
-            prow = false;
-            dozap = false;
-            BytesReceivedOld = 0;
-            BytesReceived = 0;
-
-            QUrl url(S);
-
-            put = S;
-            put.remove("http://").remove("https://");
-            int n = put.lastIndexOf("/");
-            if (n > -1)
-                put.remove(n + 1, put.size());
-            else
-                put = put + "/";
-            put.replace(".", "_");
-
-            fileName = url.fileName();
-            if (fileName != "") {
-                //            QFile f(Robot::MW->d+put+fileName);
-                //            if(f.exists())
-                //            {
-                //                seek=f.size();
-                //            }
-            } else
-                fileName = randSimv();
-
-            // создаем объект для запроса
-            QNetworkRequest request(url);
-            request.setRawHeader(
-                "Connection",
-                "keep-alive");
-            request.setRawHeader(
-                "Upgrade-Insecure-Requests",
-                "1");
-            request.setRawHeader(
-                "User-Agent",
-                "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/46.0.2490.71 Safari/537.36");
-            request.setRawHeader(
-                "Accept",
-                "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
-            if (seek) {
-                QByteArray b = QString("bytes=%1-").arg(seek).toUtf8();
-                request.setRawHeader(
-                    "range",
-                    b);
-            }
-            request.setRawHeader(
-                "Accept-Language",
-                "ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4");
-            // Выполняем запрос, получаем указатель на объект
-            // ответственный за ответ
-            QNetworkReply* reply = Mymanager.get(request);
-            // Подписываемся на сигнал о готовности загрузки
-            connect(reply, &QNetworkReply::finished,
-                this, &Work::replyFinished);
-
-            connect(reply, &QNetworkReply::readyRead,
-                this, &Work::downloadProgress);
-            break;
-        } else {
-            m.unlock();
-            QThread::msleep(1000);
-        }
+        connect(reply_curent, &QNetworkReply::readyRead,
+            this, &Work::downloadProgress);
+    } else {
+        QThread::msleep(1000);
+        QMetaObject::invokeMethod(this, &Work::nach, Qt::QueuedConnection);
     }
 }
 
-void Work::prov_s1(QString host, QString url, QString& s1)
+void Work::timeout()
+{
+    reply_curent->abort();
+}
+
+void Work::setStop()
+{
+    thread()->exit();
+    //thread()->wait();
+}
+
+void prov_s1(QString host, QString url, QString& s1)
 {
     if (s1.indexOf("//") == 0) {
         s1.replace("//", url.mid(0, url.indexOf("://") + 3));
@@ -224,8 +145,6 @@ void Work::obrabotka(QNetworkReply* reply)
 {
     QByteArray content = reply->readAll();
     int siz = content.size();
-    QStringList sl_img;
-    QStringList sl_a;
 
     QString ur = reply->url().toString();
     QString host = reply->url().host();
@@ -240,21 +159,24 @@ void Work::obrabotka(QNetworkReply* reply)
             }
         }
         if (n > -1) {
-            if (content.at(n) != '<') {
+            if (siz > 1000000 || content.at(n) != '<') {
                 if (siz > 100000) {
-                    funZap(content);
+                    funZap(content, reply->url().toString());
                     QPixmap pp;
                     pp.loadFromData(content);
                     if (!pp.isNull() && pp.height() > 100 && pp.width() > 100) {
-                        emit MyemitIMG(pp, S);
+                        emit emit_pixmap(pp, reply->url().toString());
                     }
                 }
             } else {
-                string html = content.toStdString();
+                QStringList sl_img;
+                QStringList sl_a;
+
                 HTML::ParserDom parser;
-                tree<HTML::Node> dom = parser.parseTree(html);
+                tree<HTML::Node> dom = parser.parseTree(content.toStdString());
                 tree<HTML::Node>::iterator it = dom.begin();
                 tree<HTML::Node>::iterator end = dom.end();
+
                 for (; it != end; ++it) {
                     if (it->tagName() == "a") {
                         it->parseAttributes();
@@ -277,11 +199,6 @@ void Work::obrabotka(QNetworkReply* reply)
                         ind = s1.indexOf("tel:");
                         if (ind > -1) {
                             s1.remove(ind, s1.length());
-                        }
-                        if (s1.contains("ru.webcams.travel")) {
-                            qDebug() << ur;
-                            qDebug() << s1;
-                            qDebug() << "";
                         }
                         if (s1.length() > 0) {
                             prov_s1(host, url, s1);
@@ -307,13 +224,14 @@ void Work::obrabotka(QNetworkReply* reply)
                         }
                     }
                 }
+                dom.clear();
                 sl_a.removeDuplicates();
                 sl_img.removeDuplicates();
                 for (int i = 0; i < sl_a.size(); i++) {
-                    rob->add_sl_url(sl_a.at(i));
+                    Robot::add_sl_url(sl_a.at(i));
                 }
                 for (int i = 0; i < sl_img.size(); i++) {
-                    rob->add_sl_url_img(sl_img.at(i));
+                    Robot::add_sl_url_img(sl_img.at(i));
                 }
             }
         }
@@ -322,125 +240,96 @@ void Work::obrabotka(QNetworkReply* reply)
 
 void Work::replyFinished()
 {
+    if (timer.isActive()) {
+        timer.stop();
+    }
     QNetworkReply* reply = (QNetworkReply*)sender();
-    if (stop) {
-        Sl.clear();
+    if (Robot::stop) {
+        sl.clear();
         return;
     }
-
-    funProw(reply);
-
     if (reply->hasRawHeader("Location")) {
         QString s1 = reply->rawHeader("Location");
         if (s1.length() > 8) {
-            rob->add_sl_url(s1);
+            Robot::add_sl_url(s1);
         }
     }
 
-    if (reply->error() == QNetworkReply::NoError && !prop) {
+    if (reply->error() == QNetworkReply::NoError) {
         // Получаем содержимое ответа
         if (dozap) {
             QByteArray content = reply->readAll();
-            funZap(content);
+            funZap(content, reply->url());
         } else {
             obrabotka(reply);
         }
     }
 
     if (reply->error() != QNetworkReply::NoError) {
-        Work::m1.lock();
-        qDebug() << "XXX=" << S;
-        qDebug() << "YYY=" << reply->url();
-        qDebug() << reply->error();
-        Work::m1.unlock();
+        //qDebug() << "YYY=" << reply->url();
+        //qDebug() << reply->error();
     }
-
-    //    Robot::MW->m3.lock();
-    //    append(ur,Robot::MW->sl);
-    //    Robot::MW->m3.unlock();
-
     reply->deleteLater();
-
-    nach();
+    QMetaObject::invokeMethod(this, &Work::nach, Qt::QueuedConnection);
 }
 
-void Work::setStop()
+void Work::funZap(QByteArray& content, const QUrl& url)
 {
-    stop = true;
-    Mythread->exit();
-    //Mythread->wait();
-}
+    QString put = url.toString();
+    put.remove("http://").remove("https://");
+    int n = put.lastIndexOf("/");
+    if (n > -1)
+        put.remove(n + 1, put.size());
+    else
+        put = put + "/";
+    put.replace(".", "_");
 
-void Work::funProw(QNetworkReply* reply)
-{
-    if (!prow) {
-        prow = true;
-        if (seek) {
-            if (reply->hasRawHeader("Content-Range")) {
-                QString s1 = reply->rawHeader("Content-Range");
-                seek = s1.remove("bytes ").split("-").at(0).toInt();
-            } else {
-                if (reply->hasRawHeader("Content-Length")) {
-                    QString s1 = reply->rawHeader("Content-Length");
-                    if (seek == s1.toInt()) {
-                        prop = true;
-                        reply->abort();
-                    } else {
-                        seek = 0;
-                    }
-                } else {
-                    prop = true;
-                    reply->abort();
-                }
-            }
-        }
-    }
-}
+    QString fileName = url.fileName();
+    if (fileName == "")
+        fileName = randSimv();
 
-void Work::funZap(QByteArray& content)
-{
     QDir d;
-    QFile f(rob->dir_web + "" + put + fileName);
-    bool b = d.mkpath(rob->dir_web + put);
+    bool b = d.mkpath(Robot::dir_web + put);
     if (!b) {
         qDebug() << put;
     }
+    QFile f(Robot::dir_web + put + fileName);
     if (dozap) {
         if (f.open(QIODevice::Append)) {
             f.write(content);
             f.close();
         }
     } else {
-        if (f.open(QIODevice::ReadWrite)) {
-            f.seek(seek);
+        if (f.open(QIODevice::WriteOnly)) {
             f.write(content);
             f.close();
         }
-    }
-    QString s = f.fileName();
-    int i = s.lastIndexOf(".");
-    if (i > 0) {
-        s.remove(i, s.size());
-    }
-    f.setFileName(s + ".txt");
-    if (f.open(QIODevice::Append)) {
-        f.write(S.toUtf8());
-        f.close();
+        QString s = f.fileName();
+        int i = s.lastIndexOf(".");
+        if (i > 0) {
+            s.remove(i, s.size());
+        }
+        f.setFileName(s + ".txt");
+        if (f.open(QIODevice::WriteOnly)) {
+            f.write(url.toString().toUtf8());
+            f.close();
+        }
     }
 }
 
 void Work::downloadProgress()
 {
+    if (timer.isActive()) {
+        timer.stop();
+    }
     QNetworkReply* reply = (QNetworkReply*)sender();
-    if (stop) {
-        Sl.clear();
+    if (Robot::stop) {
+        sl.clear();
         return;
     }
-    BytesReceived = reply->size();
-    funProw(reply);
-    if (BytesReceived > 5000000) {
+    if (reply->size() > 5000000) {
         QByteArray content = reply->readAll();
-        funZap(content);
+        funZap(content, reply->url());
         dozap = true;
     }
 }

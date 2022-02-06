@@ -7,13 +7,13 @@
 
 class StringListThread {
 public:
-    void add(QString s);
-    void append_not_mutex(QString&& s);
-    void add_first(QString s);
+    void append_not_mutex(const QString& s);
+    void append_first(QString s);
     void clear();
     void save_to_ts(QTextStream& ts);
-    int size_not_mutex();
+    int size();
     std::tuple<bool, QString> get_empty_size_string();
+    void append(const QString& s);
 
 private:
     QStringList sl;

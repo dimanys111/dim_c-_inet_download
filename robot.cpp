@@ -3,21 +3,29 @@
 #include "work.h"
 #include <QApplication>
 
+volatile bool Robot::pausa;
+QString Robot::dir_web;
+QString Robot::dir_bonga;
+volatile bool Robot::stop;
+StringListThread Robot::sl_url;
+
 Robot::Robot(MainWindow* mw)
-    : mw(mw)
-    , wb_m3u(this)
+    : sl(-1, "")
 {
+    connect(&wb_m3u.wb, &Work_Bonga::emit_part_vid, &mw->stream, &Stream::start_slot);
+    connect(&wb_m3u, &Work_Bonga_M3U::emit_set_label, mw, &MainWindow::set_label);
+    connect(&wb_m3u, &Work_Bonga_M3U::emit_set_le, mw, &MainWindow::set_le);
     pausa = false;
-    Mythread = new QThread();
-    moveToThread(Mythread);
-    Mythread->start();
+    moveToThread(new QThread());
+    thread()->start();
     QDir path;
     path.mkpath(qApp->applicationDirPath() + "/zzz");
     dir_web = qApp->applicationDirPath() + "/zzz/";
     dir_bonga = qApp->applicationDirPath() + "/bonga/";
     connect(this, &Robot::add_bonga, &wb_m3u, &Work_Bonga_M3U::slot_set_model);
     for (int i = 0; i < 100; i++) {
-        ws << new Work(this);
+        ws << new Work();
+        connect(ws.last(), &Work::emit_pixmap, mw, &MainWindow::setPixmap);
     }
 
     KolIspWork = ws.size();
@@ -41,26 +49,29 @@ Robot::Robot(MainWindow* mw)
         while (!ts.atEnd()) {
             QString s;
             ts >> s;
-            sl_url.append_not_mutex(StrToChar(s));
+            sl_url.append_not_mutex(s);
         }
         f.close();
     }
 
-    QTimer::singleShot(0, this, [&] { addWork(); });
+    QMetaObject::invokeMethod(this, &Robot::addWork, Qt::QueuedConnection);
 }
 
 Robot::~Robot()
 {
+    thread()->deleteLater();
 }
 
 void Robot::add_sl_url(QString s)
 {
-    sl_url.add(s);
+    if (!pausa)
+        sl_url.append(s);
 }
 
 void Robot::add_sl_url_img(QString s)
 {
-    sl_url.add_first(s);
+    if (!pausa)
+        sl_url.append_first(s);
 }
 
 void Robot::setMaxIspWork(int i)
@@ -82,6 +93,7 @@ void Robot::save()
         ts.flush();
         f.close();
     }
+    sl.clear();
     f.setFileName(qApp->applicationDirPath() + "/sl_url.sl");
     if (f.open(QIODevice::WriteOnly)) {
         QTextStream ts(&f);
@@ -89,29 +101,25 @@ void Robot::save()
         ts.flush();
         f.close();
     }
+    sl_url.clear();
 }
 
 void Robot::set_save_bool()
 {
-    save();
     stop = true;
-    Mythread->exit();
-    Mythread->wait();
-    Mythread->deleteLater();
+    save();
     int i = 0;
     while (i < ws.size()) {
         ws.at(i)->setStop();
         i++;
     }
     wb_m3u.setStop();
+    thread()->exit();
+    thread()->wait();
 }
-
-int jjjold = 0;
 
 void Robot::addWork()
 {
-    int jjj = sl_url.size_not_mutex() / 1000000 + 1;
-    qDebug() << "jjj=" << jjj;
     while (true) {
         if (stop)
             return;
@@ -123,14 +131,14 @@ void Robot::addWork()
                     while (!b) {
                         int z = KolIspWork;
                         for (int n = 0; n < z; n++) {
-                            if (ws.at(n)->getSlSize() < 10) {
+                            if (ws.at(n)->getSlSize() < 100) {
                                 ws.at(n)->addSl(s);
                                 b = true;
                                 break;
                             }
                         }
                         if (!b) {
-                            QThread::msleep(1000);
+                            QThread::msleep(100);
                         }
                     }
                 }
@@ -138,6 +146,8 @@ void Robot::addWork()
                 QThread::msleep(1000);
             }
         } else {
+            sl.clear();
+            sl_url.clear();
             QThread::msleep(2000);
             for (int n = 0; n < ws.size(); n++) {
                 if (ws.at(n)->getSlSize()) {
@@ -145,7 +155,7 @@ void Robot::addWork()
                 }
             }
             qDebug() << "всего sl=" << sl.size();
-            qDebug() << "всего sl_url=" << sl_url.size_not_mutex();
+            qDebug() << "всего sl_url=" << sl_url.size();
         }
     }
 }

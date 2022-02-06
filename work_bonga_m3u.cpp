@@ -23,29 +23,31 @@ using namespace std;
 
 Work_Bonga_M3U::~Work_Bonga_M3U()
 {
+    thread()->deleteLater();
 }
 
-Work_Bonga_M3U::Work_Bonga_M3U(Robot* r)
-    : robot(r)
-    , wb(this)
+Work_Bonga_M3U::Work_Bonga_M3U()
+    : wb(this)
 {
-    Mythread = new QThread();
-    Mymanager.moveToThread(Mythread);
-    Mymanager_Post.moveToThread(Mythread);
-    moveToThread(Mythread);
-    connect(this, &Work_Bonga_M3U::MyemitIMG, r->mw, &MainWindow::setImage);
-    connect(Mythread, &QThread::finished, Mythread, &QThread::deleteLater);
-    connect(&wb, &Work_Bonga::emit_part_vid, &r->mw->stream, &Stream::start_slot);
-    Mythread->start();
-    QTimer::singleShot(delta, this, [&] { nach(); });
-    //QTimer::singleShot(delta, this, [&] { slot_start(); });
+    moveToThread(new QThread());
+    Mymanager.moveToThread(thread());
+    thread()->start();
+    QTimer::singleShot(delta, this, &Work_Bonga_M3U::nach);
 
-    QMetaObject::invokeMethod(this, &Work_Bonga_M3U::slot_start, Qt::QueuedConnection);
+    QMetaObject::invokeMethod(this, &Work_Bonga_M3U::slot_start_first, Qt::DirectConnection);
+}
+
+void Work_Bonga_M3U::slot_start_first()
+{
+
+    slot_start();
+
+    QTimer::singleShot(30000, this, &Work_Bonga_M3U::slot_start);
 }
 
 void Work_Bonga_M3U::nach()
 {
-    if (stop) {
+    if (Robot::stop) {
         return;
     }
 
@@ -77,39 +79,37 @@ void Work_Bonga_M3U::nach()
             this, &Work_Bonga_M3U::replyFinished);
     }
 
-    QTimer::singleShot(delta, this, [&] { nach(); });
-}
-
-void Work_Bonga_M3U::slot_start_first()
-{
-    if (stop) {
-        return;
-    }
-
-    if (name_mod != "") {
-        QByteArray ba = QString("method=getRoomData&args[]=" + name_mod + "&args[]=false").toUtf8();
-
-        QDateTime dt(QDateTime::currentDateTime());
-        auto time_str = QString::number(dt.toMSecsSinceEpoch());
-
-        auto url = QUrl("https://rt.bongacams10.com/tools/amf.php?x-country=ru&res=845856?" + time_str);
-        QNetworkRequest request(url);
-        request.setRawHeader(
-            "Content-Type", "application/x-www-form-urlencoded");
-        request.setRawHeader(
-            "X-Requested-With", "XMLHttpRequest");
-
-        QNetworkReply* reply = Mymanager_Post.post(request, ba);
-        connect(reply, &QNetworkReply::finished,
-            this, &Work_Bonga_M3U::replyFinished_);
-    }
+    QTimer::singleShot(delta, this, &Work_Bonga_M3U::nach);
 }
 
 void Work_Bonga_M3U::slot_start()
 {
-    slot_start_first();
+    if (Robot::stop) {
+        return;
+    }
 
-    QTimer::singleShot(30000, this, [&] { slot_start(); });
+    if (name_mod != "") {
+        QByteArray ba = QString("method=getRoomData&args[]=" + name_mod + "&args[]=&args[]=").toUtf8();
+
+        QDateTime dt(QDateTime::currentDateTime());
+        auto time_str = QString::number(dt.toMSecsSinceEpoch());
+
+        auto url = QUrl("https://rt.bongacams21.com/tools/amf.php?x-country=ru&res=475592?" + time_str);
+        QNetworkRequest request(url);
+        request.setRawHeader("Content-Type",
+            "application/x-www-form-urlencoded");
+        request.setRawHeader("X-Requested-With",
+            "XMLHttpRequest");
+
+        request.setRawHeader("x-ab-split-group",
+            "aa6f9c0902ce07fd14fc210c92473c977e07ddea0fe157dbcd90c9521ab5e1e571d8a93f2d7edce3");
+        request.setRawHeader("cookie",
+            "bonga20120608=2960d2a800a07f1bdc54fe47accdcc71");
+
+        QNetworkReply* reply = Mymanager.post(request, ba);
+        connect(reply, &QNetworkReply::finished,
+            this, &Work_Bonga_M3U::replyFinished_);
+    }
 }
 
 void Work_Bonga_M3U::replyFinished_()
@@ -124,10 +124,10 @@ void Work_Bonga_M3U::replyFinished_()
     QJsonValue root = o.value("localData");
     QJsonValue videoServerUrl = root.toObject().value("videoServerUrl");
     s = videoServerUrl.toString();
-    url_chunks_m3u8 = "https:" + s + "/hls/stream_" + name_mod + "/public/stream_" + name_mod + "/chunks.m3u8";
+    url_chunks_m3u8 = "https:" + s + "/hls/stream_" + name_mod + "/public-aac/stream_" + name_mod + "/chunks.m3u8";
     QJsonValue vsid = root.toObject().value("vsid");
     vsid_str = vsid.toString();
-    if (stop) {
+    if (Robot::stop) {
         return;
     }
     reply->deleteLater();
@@ -142,8 +142,8 @@ void Work_Bonga_M3U::slot_set_model(QString s)
 QString Work_Bonga_M3U::funZap(QByteArray& content, QString fileName)
 {
     QDir d;
-    QFile f(robot->dir_bonga + name_mod + "/" + fileName);
-    bool b = d.mkpath(robot->dir_bonga + name_mod);
+    QFile f(Robot::dir_bonga + name_mod + "/" + fileName);
+    bool b = d.mkpath(Robot::dir_bonga + name_mod);
     if (!b) {
         qDebug() << name_mod;
     }
@@ -159,7 +159,7 @@ void Work_Bonga_M3U::replyFinished()
 {
     QNetworkReply* reply = (QNetworkReply*)sender();
 
-    if (stop) {
+    if (Robot::stop) {
         return;
     }
 
@@ -188,8 +188,8 @@ void Work_Bonga_M3U::replyFinished()
         if (out == "") {
             wb.zap_all();
         }
-        emit robot->emit_set_le(out);
-        emit robot->emit_set_label(content);
+        emit emit_set_le(out);
+        emit emit_set_label(content);
     } else {
         qDebug() << reply->url();
         qDebug() << reply->error();
@@ -200,8 +200,7 @@ void Work_Bonga_M3U::replyFinished()
 
 void Work_Bonga_M3U::setStop()
 {
-    stop = true;
-    Mythread->exit();
-    Mythread->wait();
     wb.setStop();
+    thread()->exit();
+    thread()->wait();
 }

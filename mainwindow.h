@@ -36,12 +36,12 @@ protected:
     void mouseDoubleClickEvent(QMouseEvent* event);
 signals:
     void start_emit(QString in_f);
-    void end_emit();
 public slots:
-    void setImage(QPixmap pp, QString s);
+    void setPixmap(QPixmap pp, QString s = "");
     void set_label(QByteArray i);
     void set_le(QString i);
     void slot_set_vid_file_name(QString s);
+    void setImage(QImage img);
 private slots:
     void on_pushButton_clicked();
     void on_pushButton_2_clicked();

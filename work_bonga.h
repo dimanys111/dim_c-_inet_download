@@ -9,7 +9,6 @@
 #include <QtNetwork/QNetworkReply>
 #include <QtNetwork/QNetworkRequest>
 
-class Robot;
 class Work_Bonga_M3U;
 
 class Work_Bonga : public QObject {
@@ -24,11 +23,11 @@ public:
     void zap_all();
 
 private:
-    Work_Bonga_M3U* wb;
+    QStringList list_zap;
+    QList<int> list_nom;
+    int nom_pot { 0 };
+    Work_Bonga_M3U* wb { nullptr };
     QStringList list_all;
-    volatile bool stop { false };
-    QMutex m;
-    QThread* Mythread;
     QNetworkAccessManager Mymanager;
     void funZap(QByteArray& content, QString& fileName);
 

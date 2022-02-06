@@ -119,18 +119,18 @@ void Stream::start_slot(QString in_f, QString name_mod)
     AVPacket packet = { .data = NULL, .size = 0 };
     unsigned int stream_index;
 
-    if ((ret = open_input_file(in_f.toStdString().c_str())) < 0)
+    if (open_input_file(in_f.toStdString().c_str()) < 0)
         goto end;
 
     if (!ofmt_ctx) {
         QString s;
-        if ((ret = open_output_file(in_f.toStdString().c_str(), name_mod, s)) < 0)
+        if (open_output_file(in_f.toStdString().c_str(), name_mod, s) < 0)
             goto end;
-        emit_out_file(s);
+        emit emit_out_file(s);
     }
     /* read all packets */
     while (1) {
-        if ((ret = av_read_frame(ifmt_ctx, &packet)) < 0)
+        if (av_read_frame(ifmt_ctx, &packet) < 0)
             break;
         stream_index = packet.stream_index;
         av_log(NULL, AV_LOG_DEBUG, "Demuxer gave frame of stream_index %u\n",
@@ -157,7 +157,7 @@ void Stream::start_slot(QString in_f, QString name_mod)
             }
         }
 
-        ret = av_interleaved_write_frame(ofmt_ctx, &packet);
+        av_interleaved_write_frame(ofmt_ctx, &packet);
 
         av_packet_unref(&packet);
     }
@@ -182,14 +182,13 @@ Stream::Stream()
 {
     av_register_all();
     ofmt_ctx = NULL;
-    thread = new QThread;
-    moveToThread(thread);
-    thread->start();
+    moveToThread(new QThread);
+    thread()->start();
 }
 
 Stream::~Stream()
 {
-    thread->exit();
-    thread->wait();
-    thread->deleteLater();
+    thread()->exit();
+    thread()->wait();
+    thread()->deleteLater();
 }

@@ -24,8 +24,8 @@ win32 {
 }
 
 SOURCES += main.cpp\
-    Player.cpp \
         mainwindow.cpp \
+    player.cpp \
     robot.cpp \
     htmlcxx/html/ParserDom.cc \
     htmlcxx/html/Node.cc \
@@ -38,11 +38,11 @@ SOURCES += main.cpp\
     work_bonga_m3u.cpp
 
 HEADERS  += mainwindow.h \
-    Player.h \
     htmlcxx/html/tree.h \
     htmlcxx/html/ParserDom.h \
     htmlcxx/html/Node.h \
     htmlcxx/html/ParserSax.h \
+    player.h \
     robot.h \
     spisovetka.h \
     stream.h \
@@ -55,6 +55,10 @@ FORMS    += mainwindow.ui
 
 win32 {
     LIBS +=  -lopengl32 -lglu32 -L../../ffmpeg/64/lib
+}
+
+unix:!macx {
+    LIBS +=
 }
 
 LIBS +=  -lavcodec -lavutil -lavformat -lswscale -lavfilter

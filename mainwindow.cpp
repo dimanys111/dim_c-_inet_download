@@ -8,6 +8,8 @@
 
 #include "QDesktopServices"
 
+#include "player.h"
+
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
     , robot(this)
@@ -16,15 +18,18 @@ MainWindow::MainWindow(QWidget* parent)
     ui->setupUi(this);
     setMaxSlid(robot.KolIspWork);
     ui->label->setMinimumHeight(0);
-    connect(&robot, &Robot::emit_set_label, this, &MainWindow::set_label);
-    connect(&robot, &Robot::emit_set_le, this, &MainWindow::set_le);
-    connect(this, &MainWindow::end_emit, &stream, &Stream::end_slot);
     connect(&stream, &Stream::emit_out_file, this, &MainWindow::slot_set_vid_file_name);
+    connect(Player::get_instance(), &Player::emit_img, this, &MainWindow::setImage);
 }
 
 void MainWindow::slot_set_vid_file_name(QString s)
 {
     s_vid_tek = s;
+}
+
+void MainWindow::setImage(QImage img)
+{
+    setPixmap(QPixmap::fromImage(img));
 }
 
 void MainWindow::set_label(QByteArray i)
@@ -44,6 +49,7 @@ void MainWindow::on_pushButton_clicked()
 
 MainWindow::~MainWindow()
 {
+    robot.set_save_bool();
 }
 
 void MainWindow::setMaxSlid(int i)
@@ -79,7 +85,7 @@ void MainWindow::mousePressEvent(QMouseEvent* event)
 
 void MainWindow::mouseDoubleClickEvent(QMouseEvent* event)
 {
-    QUrl url("https://rt.bongacams10.com/" + name_mod);
+    QUrl url("https://rt.bongacams21.com/" + name_mod);
     QDesktopServices::openUrl(url);
 }
 
@@ -98,14 +104,14 @@ void MainWindow::resizeImage(QResizeEvent* e)
 
 void MainWindow::on_pushButton_2_clicked()
 {
-    robot.pausa = !robot.pausa;
-    if (robot.pausa)
+    Robot::pausa = !Robot::pausa;
+    if (Robot::pausa)
         ui->pushButton_2->setText("Play");
     else
         ui->pushButton_2->setText("Stop");
 }
 
-void MainWindow::setImage(QPixmap pp, QString s)
+void MainWindow::setPixmap(QPixmap pp, QString s)
 {
     S_tek = s;
     pix = pp;
@@ -159,5 +165,5 @@ void MainWindow::on_pushButton_4_clicked()
 
 void MainWindow::on_pushButton_5_clicked()
 {
-    QDesktopServices::openUrl(QUrl("file://" + robot.dir_bonga + name_mod));
+    QDesktopServices::openUrl(QUrl("file://" + Robot::dir_bonga + name_mod));
 }

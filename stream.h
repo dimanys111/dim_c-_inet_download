@@ -6,8 +6,6 @@
 
 class Stream : public QObject {
     Q_OBJECT
-private:
-    QThread* thread;
 
 public:
     Stream();

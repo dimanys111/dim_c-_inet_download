@@ -18,28 +18,24 @@ class Robot : public QObject {
     Q_OBJECT
 public:
     int KolIspWork;
-    MainWindow* mw;
-    volatile bool pausa;
-    QString dir_web;
-    QString dir_bonga;
+    static volatile bool pausa;
+    static QString dir_web;
+    static QString dir_bonga;
+    static volatile bool stop;
     Robot(MainWindow* mw);
     Work_Bonga_M3U wb_m3u;
     ~Robot();
-    void add_sl_url(QString s);
-    void add_sl_url_img(QString s);
+    static void add_sl_url(QString s);
+    static void add_sl_url_img(QString s);
     void setMaxIspWork(int i);
+    void set_save_bool();
 
 private:
-    StringListThread sl_url;
+    static StringListThread sl_url;
     SpisoVetka sl;
-    volatile bool stop { false };
-    QThread* Mythread;
     QList<Work*> ws;
-    void set_save_bool();
 signals:
     void add_bonga(QString s);
-    void emit_set_label(QByteArray i);
-    void emit_set_le(QString i);
 public slots:
     void clear_sl_url();
     void addWork();
