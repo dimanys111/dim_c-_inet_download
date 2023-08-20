@@ -2,41 +2,25 @@
 #include "QDir"
 #include "QFile"
 #include "math.h"
-#include "work.h"
+#include "qapplication.h"
 #include "work_bonga_m3u.h"
 #include <QUrl>
 #include <ctime>
-#include <htmlcxx/html/Node.h>
-#include <htmlcxx/html/ParserDom.h>
-#include <htmlcxx/html/tree.h>
 
-#include "mainwindow.h"
 #include "player.h"
 #include "robot.h"
 
-using namespace htmlcxx;
 using namespace std;
 
-QString randSimv()
-{
-    const QString possibleCharacters("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789");
-    const int randomStringLength = 12; // assuming you want random strings of 12 characters
+QString randSimv();
 
-    QString randomString;
-    for (int i = 0; i < randomStringLength; ++i) {
-        int index = rand() % possibleCharacters.length();
-        QChar nextChar = possibleCharacters.at(index);
-        randomString.append(nextChar);
-    }
-    return randomString;
-}
-
-void Work_Bonga::addSl(QString s)
+Work_Bonga::Work_Bonga(Work_Bonga_M3U* wb)
+    : wb(wb)
 {
-    if (!list_all.contains(s)) {
-        list_all << s;
-        emit Myemit(s);
-    }
+    moveToThread(new QThread());
+    Mymanager.moveToThread(thread());
+    connect(this, &Work_Bonga::nachEmit, this, &Work_Bonga::nach);
+    thread()->start();
 }
 
 Work_Bonga::~Work_Bonga()
@@ -45,24 +29,21 @@ Work_Bonga::~Work_Bonga()
     thread()->deleteLater();
 }
 
-Work_Bonga::Work_Bonga(Work_Bonga_M3U* wb)
-    : wb(wb)
+void Work_Bonga::addSl(QString s)
 {
-    moveToThread(new QThread());
-    Mymanager.moveToThread(thread());
-    connect(this, &Work_Bonga::Myemit, this, &Work_Bonga::nach);
-    thread()->start();
+    if (list_all.size() > 100) {
+        for (int i = 0; i < 50; i++)
+            list_all.removeFirst();
+    }
+    if (!list_all.contains(s)) {
+        list_all << s;
+        emit nachEmit(s);
+    }
 }
 
 void Work_Bonga::nach(QString url_str)
 {
-    if (Robot::stop) {
-        return;
-    }
-
     QUrl url(url_str);
-
-    // создаем объект для запроса
     QNetworkRequest request(url);
     request.setRawHeader(
         "Connection",
@@ -79,19 +60,13 @@ void Work_Bonga::nach(QString url_str)
     request.setRawHeader(
         "Accept-Language",
         "ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4");
-    // Выполняем запрос, получаем указатель на объект
-    // ответственный за ответ
     QNetworkReply* reply = Mymanager.get(request);
-    // Подписываемся на сигнал о готовности загрузки
     connect(reply, &QNetworkReply::finished, this, &Work_Bonga::replyFinished);
 }
 
 void Work_Bonga::replyFinished()
 {
     QNetworkReply* reply = (QNetworkReply*)sender();
-    if (Robot::stop) {
-        return;
-    }
     if (reply->error() == QNetworkReply::NoError) {
         // Получаем содержимое ответа
         QByteArray content = reply->readAll();
@@ -151,4 +126,18 @@ void Work_Bonga::funZap(QByteArray& content, QString& fileName)
         list_zap.removeAt(nom);
         list_nom.removeAt(nom);
     }
+}
+
+QString randSimv()
+{
+    const QString possibleCharacters("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789");
+    const int randomStringLength = 12; // assuming you want random strings of 12 characters
+
+    QString randomString;
+    for (int i = 0; i < randomStringLength; ++i) {
+        int index = rand() % possibleCharacters.length();
+        QChar nextChar = possibleCharacters.at(index);
+        randomString.append(nextChar);
+    }
+    return randomString;
 }

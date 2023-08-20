@@ -51,7 +51,6 @@ private:
 
     AVCodecContext* pCodecCtx = NULL;
 
-    AVCodec* pCodec = NULL;
     AVFrame* pFrame = NULL;
 
     uint8_t* buf = NULL;

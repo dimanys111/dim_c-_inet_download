@@ -39,8 +39,6 @@ static int open_input_file(const char* filename)
         av_log(NULL, AV_LOG_ERROR, "Cannot find stream information\n");
         return ret;
     }
-
-    //av_dump_format(ifmt_ctx, 0, filename, 0);
     return 0;
 }
 
@@ -115,7 +113,6 @@ void Stream::start_slot(QString in_f, QString name_mod)
     nom_zap = nom_z;
 
     qDebug() << in_f;
-    int ret;
     AVPacket packet = { .data = NULL, .size = 0 };
     unsigned int stream_index;
 
@@ -147,18 +144,13 @@ void Stream::start_slot(QString in_f, QString name_mod)
         } else {
             if ((old_dts[stream_index] - dts) < 5) {
                 qDebug() << dts;
-                if (ofmt_ctx->streams[stream_index]->cur_dts > 0) {
-                    dts = packet.pts = packet.dts = ofmt_ctx->streams[stream_index]->cur_dts + 1;
-                }
                 qDebug() << dts << old_dts[stream_index] << "xxx";
                 old_dts[stream_index] = dts;
             } else {
                 qDebug() << dts << old_dts[stream_index] << "yyy";
             }
         }
-
         av_interleaved_write_frame(ofmt_ctx, &packet);
-
         av_packet_unref(&packet);
     }
 end:
@@ -180,7 +172,6 @@ void Stream::end_slot()
 
 Stream::Stream()
 {
-    av_register_all();
     ofmt_ctx = NULL;
     moveToThread(new QThread);
     thread()->start();

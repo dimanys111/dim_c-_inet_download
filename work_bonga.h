@@ -33,7 +33,7 @@ private:
 
 signals:
     void emit_part_vid(QString s, QString name_mod);
-    void Myemit(QString url_str);
+    void nachEmit(QString url_str);
 private slots:
     void nach(QString url_str);
     void replyFinished();

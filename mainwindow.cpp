@@ -2,7 +2,6 @@
 #include "QResizeEvent"
 #include "QTimer"
 #include "ui_mainwindow.h"
-#include "work_bonga.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -16,7 +15,6 @@ MainWindow::MainWindow(QWidget* parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-    setMaxSlid(robot.KolIspWork);
     ui->label->setMinimumHeight(0);
     connect(&stream, &Stream::emit_out_file, this, &MainWindow::slot_set_vid_file_name);
     connect(Player::get_instance(), &Player::emit_img, this, &MainWindow::setImage);
@@ -29,33 +27,25 @@ void MainWindow::slot_set_vid_file_name(QString s)
 
 void MainWindow::setImage(QImage img)
 {
-    setPixmap(QPixmap::fromImage(img));
+    pix = QPixmap::fromImage(img);
+    QPixmap pixmap;
+    if (pix.height() > ui->label->height())
+        pixmap = pix.scaledToHeight(ui->label->height());
+    else
+        pixmap = pix;
+    if (pixmap.width() > ui->label->width())
+        pixmap = pix.scaledToWidth(ui->label->width());
+    ui->label->setPixmap(pixmap);
 }
 
-void MainWindow::set_label(QByteArray i)
+void MainWindow::set_label(QByteArray ba)
 {
-    ui->label_2->setText(i);
+    ui->label_2->setText(ba);
 }
 
 void MainWindow::set_le(QString i)
 {
     ui->lineEdit_2->setText(i);
-}
-
-void MainWindow::on_pushButton_clicked()
-{
-    robot.add_sl_url(ui->lineEdit->text());
-}
-
-MainWindow::~MainWindow()
-{
-    robot.set_save_bool();
-}
-
-void MainWindow::setMaxSlid(int i)
-{
-    ui->horizontalSlider->setMaximum(i);
-    ui->horizontalSlider->setValue(i);
 }
 
 void MainWindow::resizeEvent(QResizeEvent* e)
@@ -66,26 +56,10 @@ void MainWindow::resizeEvent(QResizeEvent* e)
     }
 }
 
-void MainWindow::mousePressEvent(QMouseEvent* event)
-{
-#ifdef Q_OS_WIN32
-    QUrl url(S_tek);
-#endif
-
-#ifdef Q_OS_LINUX
-    QUrl url;
-    if (S_tek.indexOf("http") == 0)
-        url.setUrl(S_tek);
-    else
-        url.setUrl("file://" + S_tek);
-#endif
-    QDesktopServices::openUrl(url);
-    QMainWindow::mousePressEvent(event);
-}
-
 void MainWindow::mouseDoubleClickEvent(QMouseEvent* event)
 {
-    QUrl url("https://rt.bongacams21.com/" + name_mod);
+    Q_UNUSED(event)
+    QUrl url("https://rus.bonga-cams.com/" + name_mod);
     QDesktopServices::openUrl(url);
 }
 
@@ -93,49 +67,14 @@ void MainWindow::resizeImage(QResizeEvent* e)
 {
     int h = e->size().height() - e->oldSize().height();
     int w = e->size().width() - e->oldSize().width();
+    QPixmap pixmap;
     if (pix.height() > ui->label->height())
-        p = pix.scaledToHeight(ui->label->height() + h - 1);
+        pixmap = pix.scaledToHeight(ui->label->height() + h - 1);
     else
-        p = pix;
-    if (p.width() > ui->label->width())
-        p = pix.scaledToWidth(ui->label->width() + w - 1);
-    ui->label->setPixmap(p);
-}
-
-void MainWindow::on_pushButton_2_clicked()
-{
-    Robot::pausa = !Robot::pausa;
-    if (Robot::pausa)
-        ui->pushButton_2->setText("Play");
-    else
-        ui->pushButton_2->setText("Stop");
-}
-
-void MainWindow::setPixmap(QPixmap pp, QString s)
-{
-    S_tek = s;
-    pix = pp;
-    if (pix.height() > ui->label->height())
-        p = pix.scaledToHeight(ui->label->height());
-    else
-        p = pix;
-    if (p.width() > ui->label->width())
-        p = pix.scaledToWidth(ui->label->width());
-    ui->label->setPixmap(p);
-}
-
-int nom = 1;
-
-void MainWindow::on_pushButton_3_clicked()
-{
-    nom++;
-    robot.clear_sl_url();
-    ui->pushButton_3->setText(QString().number(nom));
-}
-
-void MainWindow::on_horizontalSlider_sliderMoved(int position)
-{
-    robot.setMaxIspWork(position);
+        pixmap = pix;
+    if (pixmap.width() > ui->label->width())
+        pixmap = pix.scaledToWidth(ui->label->width() + w - 1);
+    ui->label->setPixmap(pixmap);
 }
 
 void MainWindow::on_pb_start_bonga_clicked()

@@ -33,7 +33,7 @@ void Player::run_()
 int Player::open()
 {
     // open video
-    int res = avformat_open_input(&pFormatCtx, this->video_addr.c_str(), NULL, NULL);
+    int res = avformat_open_input(&pFormatCtx, video_addr.c_str(), NULL, NULL);
     // check video
     if (res != 0) {
         return -1;
@@ -75,7 +75,7 @@ Reads audio and video codec
 */
 int Player::read_audio_video_codec(void)
 {
-    pCodec = avcodec_find_decoder(pCodecParameters->codec_id);
+    auto pCodec = avcodec_find_decoder(pCodecParameters->codec_id);
     if (pCodec == NULL) {
         return -1;
     }
@@ -149,24 +149,29 @@ void Player::clear()
     if (pFormatCtx) {
         avformat_close_input(&pFormatCtx);
     }
+    pFormatCtx = nullptr;
     // Close the codecs
     if (pCodecCtx) {
         avcodec_close(pCodecCtx);
         avcodec_free_context(&pCodecCtx);
     }
+    pCodecCtx = nullptr;
     // Free the YUV frame
     if (pFrame)
         av_frame_free(&pFrame);
+    pFrame = nullptr;
     if (resize)
         sws_freeContext(resize);
+    resize = nullptr;
     if (frameFullScreen)
         av_frame_free(&frameFullScreen);
+    frameFullScreen = nullptr;
     av_free(buf);
+    buf = nullptr;
 }
 
 Player::Player()
 {
-    av_register_all();
     moveToThread(new QThread);
     thread()->start();
 }

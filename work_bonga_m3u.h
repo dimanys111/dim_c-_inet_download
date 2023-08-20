@@ -18,19 +18,16 @@ public:
     Work_Bonga_M3U();
     void setStop();
     QString name_mod;
-    QString funZap(QByteArray& content, QString fileName);
 
 private:
-    QString vsid_str;
-    int delta { 1500 };
-    int n_last { -1 };
+    int m_deltaUpdateM3U { 1500 };
+    int m_numberChankLast { -1 };
     QString url_chunks_m3u8;
     QNetworkAccessManager Mymanager;
-    void slot_start_first();
 private slots:
     void nach();
     void replyFinished();
-    void replyFinished_();
+    void replyFinished_url_chunks_m3u8();
 public slots:
     void slot_set_model(QString s);
     void slot_start();

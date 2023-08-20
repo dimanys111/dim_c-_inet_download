@@ -2,7 +2,6 @@
 #include "QDir"
 #include "QFile"
 #include "math.h"
-#include "work.h"
 #include <QBuffer>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -11,14 +10,7 @@
 #include <QUrl>
 #include <QUrlQuery>
 #include <ctime>
-#include <htmlcxx/html/Node.h>
-#include <htmlcxx/html/ParserDom.h>
-#include <htmlcxx/html/tree.h>
 
-#include "mainwindow.h"
-#include "robot.h"
-
-using namespace htmlcxx;
 using namespace std;
 
 Work_Bonga_M3U::~Work_Bonga_M3U()
@@ -32,92 +24,48 @@ Work_Bonga_M3U::Work_Bonga_M3U()
     moveToThread(new QThread());
     Mymanager.moveToThread(thread());
     thread()->start();
-    QTimer::singleShot(delta, this, &Work_Bonga_M3U::nach);
-
-    QMetaObject::invokeMethod(this, &Work_Bonga_M3U::slot_start_first, Qt::DirectConnection);
 }
 
-void Work_Bonga_M3U::slot_start_first()
+bool slot_start_ = false;
+
+void Work_Bonga_M3U::slot_set_model(QString s)
 {
-
-    slot_start();
-
-    QTimer::singleShot(30000, this, &Work_Bonga_M3U::slot_start);
-}
-
-void Work_Bonga_M3U::nach()
-{
-    if (Robot::stop) {
-        return;
-    }
-
-    if (url_chunks_m3u8 != "") {
-        QUrl url(url_chunks_m3u8);
-
-        // создаем объект для запроса
-        QNetworkRequest request(url);
-        request.setRawHeader(
-            "Connection",
-            "keep-alive");
-        request.setRawHeader(
-            "Upgrade-Insecure-Requests",
-            "1");
-        request.setRawHeader(
-            "User-Agent",
-            "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/46.0.2490.71 Safari/537.36");
-        request.setRawHeader(
-            "Accept",
-            "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
-        request.setRawHeader(
-            "Accept-Language",
-            "ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4");
-        // Выполняем запрос, получаем указатель на объект
-        // ответственный за ответ
-        QNetworkReply* reply = Mymanager.get(request);
-        // Подписываемся на сигнал о готовности загрузки
-        connect(reply, &QNetworkReply::finished,
-            this, &Work_Bonga_M3U::replyFinished);
-    }
-
-    QTimer::singleShot(delta, this, &Work_Bonga_M3U::nach);
+    name_mod = s;
+    if (!slot_start_)
+        slot_start();
 }
 
 void Work_Bonga_M3U::slot_start()
 {
-    if (Robot::stop) {
-        return;
-    }
+    slot_start_ = true;
+    QByteArray ba = QString("method=getRoomData&args[]=" + name_mod + "&args[]=&args[]=").toUtf8();
 
-    if (name_mod != "") {
-        QByteArray ba = QString("method=getRoomData&args[]=" + name_mod + "&args[]=&args[]=").toUtf8();
+    QDateTime dt(QDateTime::currentDateTime());
+    auto time_str = QString::number(dt.toMSecsSinceEpoch());
 
-        QDateTime dt(QDateTime::currentDateTime());
-        auto time_str = QString::number(dt.toMSecsSinceEpoch());
+    auto url = QUrl("https://rus.bonga-cams.com/tools/amf.php?res=934305&t=" + time_str);
+    QNetworkRequest request(url);
+    request.setRawHeader("Content-Type",
+        "application/x-www-form-urlencoded");
+    request.setRawHeader("X-Requested-With",
+        "XMLHttpRequest");
+    request.setRawHeader("cookie",
+        "bonga20120608=6fe1c1f2baf1d620453b50a1ebecf951");
 
-        auto url = QUrl("https://rt.bongacams21.com/tools/amf.php?x-country=ru&res=475592?" + time_str);
-        QNetworkRequest request(url);
-        request.setRawHeader("Content-Type",
-            "application/x-www-form-urlencoded");
-        request.setRawHeader("X-Requested-With",
-            "XMLHttpRequest");
-
-        request.setRawHeader("x-ab-split-group",
-            "aa6f9c0902ce07fd14fc210c92473c977e07ddea0fe157dbcd90c9521ab5e1e571d8a93f2d7edce3");
-        request.setRawHeader("cookie",
-            "bonga20120608=2960d2a800a07f1bdc54fe47accdcc71");
-
-        QNetworkReply* reply = Mymanager.post(request, ba);
-        connect(reply, &QNetworkReply::finished,
-            this, &Work_Bonga_M3U::replyFinished_);
-    }
+    QNetworkReply* reply = Mymanager.post(request, ba);
+    connect(reply, &QNetworkReply::finished,
+        this, &Work_Bonga_M3U::replyFinished_url_chunks_m3u8);
 }
 
-void Work_Bonga_M3U::replyFinished_()
+bool nach_ = false;
+
+void Work_Bonga_M3U::replyFinished_url_chunks_m3u8()
 {
     QNetworkReply* reply = (QNetworkReply*)sender();
     QString s = reply->url().toString();
     qDebug() << s;
     QByteArray content = reply->readAll();
+    qDebug() << content;
     QJsonDocument document = QJsonDocument::fromJson(content);
     // Забираем из документа корневой объект
     auto o = document.object();
@@ -125,48 +73,50 @@ void Work_Bonga_M3U::replyFinished_()
     QJsonValue videoServerUrl = root.toObject().value("videoServerUrl");
     s = videoServerUrl.toString();
     url_chunks_m3u8 = "https:" + s + "/hls/stream_" + name_mod + "/public-aac/stream_" + name_mod + "/chunks.m3u8";
-    QJsonValue vsid = root.toObject().value("vsid");
-    vsid_str = vsid.toString();
-    if (Robot::stop) {
-        return;
-    }
     reply->deleteLater();
+    if (!nach_)
+        nach();
 }
 
-void Work_Bonga_M3U::slot_set_model(QString s)
+void Work_Bonga_M3U::nach()
 {
-    name_mod = s;
-    slot_start_first();
-}
+    nach_ = true;
+    QUrl url(url_chunks_m3u8);
 
-QString Work_Bonga_M3U::funZap(QByteArray& content, QString fileName)
-{
-    QDir d;
-    QFile f(Robot::dir_bonga + name_mod + "/" + fileName);
-    bool b = d.mkpath(Robot::dir_bonga + name_mod);
-    if (!b) {
-        qDebug() << name_mod;
-    }
-    if (f.open(QIODevice::ReadWrite)) {
-        f.write(content);
-        f.close();
-    }
+    // создаем объект для запроса
+    QNetworkRequest request(url);
+    request.setRawHeader(
+        "Connection",
+        "keep-alive");
+    request.setRawHeader(
+        "Upgrade-Insecure-Requests",
+        "1");
+    request.setRawHeader(
+        "User-Agent",
+        "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/46.0.2490.71 Safari/537.36");
+    request.setRawHeader(
+        "Accept",
+        "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
+    request.setRawHeader(
+        "Accept-Language",
+        "ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4");
+    // Выполняем запрос, получаем указатель на объект
+    // ответственный за ответ
+    QNetworkReply* reply = Mymanager.get(request);
+    // Подписываемся на сигнал о готовности загрузки
+    connect(reply, &QNetworkReply::finished,
+        this, &Work_Bonga_M3U::replyFinished);
 
-    return f.fileName();
+    QTimer::singleShot(m_deltaUpdateM3U, this, &Work_Bonga_M3U::nach);
 }
 
 void Work_Bonga_M3U::replyFinished()
 {
     QNetworkReply* reply = (QNetworkReply*)sender();
-
-    if (Robot::stop) {
-        return;
-    }
-
     if (reply->error() == QNetworkReply::NoError) {
         // Получаем содержимое ответа
         QByteArray content = reply->readAll();
-        //funZap(content, "chunks.m3u8");
+        // funZap(content, "chunks.m3u8");
         QBuffer buffer(&content);
         buffer.open(QIODevice::ReadOnly);
 
@@ -179,10 +129,10 @@ void Work_Bonga_M3U::replyFinished()
                 wb.addSl(out);
                 s.remove(".ts");
                 auto sl = s.split("_");
-                auto n = sl.at(2).toInt();
-                if (n_last > 0 && (n - n_last) > 0)
-                    delta = n - n_last;
-                n_last = n;
+                auto numberChankLast = sl.at(2).toInt();
+                if (m_numberChankLast > 0 && (numberChankLast - m_numberChankLast) > 0)
+                    m_deltaUpdateM3U = numberChankLast - m_numberChankLast;
+                m_numberChankLast = numberChankLast;
             }
         }
         if (out == "") {

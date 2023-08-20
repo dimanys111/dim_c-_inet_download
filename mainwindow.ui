@@ -26,27 +26,6 @@
      </widget>
     </item>
     <item>
-     <widget class="QPushButton" name="pushButton">
-      <property name="text">
-       <string>youtube</string>
-      </property>
-     </widget>
-    </item>
-    <item>
-     <widget class="QPushButton" name="pushButton_2">
-      <property name="text">
-       <string>NO Stop</string>
-      </property>
-     </widget>
-    </item>
-    <item>
-     <widget class="QPushButton" name="pushButton_3">
-      <property name="text">
-       <string>Clear_sl_url</string>
-      </property>
-     </widget>
-    </item>
-    <item>
      <widget class="QWidget" name="widget" native="true">
       <property name="sizePolicy">
        <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
@@ -72,13 +51,6 @@
        </property>
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout">
-         <item>
-          <widget class="QSlider" name="horizontalSlider">
-           <property name="orientation">
-            <enum>Qt::Horizontal</enum>
-           </property>
-          </widget>
-         </item>
          <item>
           <widget class="QPushButton" name="pushButton_4">
            <property name="text">
@@ -135,7 +107,7 @@
      <x>0</x>
      <y>0</y>
      <width>376</width>
-     <height>26</height>
+     <height>23</height>
     </rect>
    </property>
   </widget>
